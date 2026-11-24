@@ -1,0 +1,41 @@
+# Local originals and repository preparation records
+.local-archive/
+
+# Catkin / CMake / SDK generated files
+build/
+devel/
+install/
+logs/
+.catkin_tools/
+/src/CMakeLists.txt
+**/sdk/obj/
+**/sdk/output/
+CMakeCache.txt
+CMakeFiles/
+*.o
+*.so
+*.so.*
+*.a
+# These original libraries are required by the legacy controller / chassis targets.
+!src/core/racecar/src/lib/libracecar_controller.a
+!src/drivers/racecar_driver/lib/libracecar_driver.a
+
+# Python / editors / OS
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+
+# Local configuration and recordings (upstream sample bags remain versioned)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+recordings/

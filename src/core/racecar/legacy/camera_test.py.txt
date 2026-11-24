@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+# This is used for ROS car 2021
+# created by quanyi on 2021/12/1
+# released on 2021/12/6
+# You need to add other codes here
+
+import rospy
+
+from geometry_msgs.msg import Twist
+
+import cv2
+import numpy as np
+
+# threshold for red and blue, expressed by array
+low_hsv = [[0, 131, 21], [77, 255, 0]]
+high_hsv = [[13, 255, 255], [131, 255, 255]]  # RED BLUE
+
+
+def my_find_contours(src):
+    hsv = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
+
+    lower = np.array(low_hsv)
+    higher = np.array(high_hsv)
+
+    dst1 = cv2.inRange(hsv, lower[0], higher[0])
+    dst2 = cv2.inRange(hsv, lower[1], higher[1])
+
+    dst = cv2.add(dst1, dst2)
+
+    element3 = np.ones((3, 3), np.uint8)
+    # image preprocess #
+    # cv2.erode(dst, element3, dst)
+    # cv2.erode(dst, element3, dst)
+    cv2.erode(dst, element3, dst)
+    cv2.dilate(dst, element3, dst)
+    cv2.dilate(dst, element3, dst)
+    cv2.imshow('dst', dst)
+    ret, contours, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    area_list = []
+    center_x = [0]
+    for c in contours:
+        area = cv2.contourArea(c)
+        area_list.append(area)
+
+    if len(area_list) > 0:
+        area_threshold = np.mean(area_list)
+
+        for c in contours:
+            area = cv2.contourArea(c)
+            if area > area_threshold and area > 1000:
+                x, y, w, h = cv2.boundingRect(c)
+                cv2.rectangle(src, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                point = x + w / 2
+                cv2.circle(src, (int(point), 240), 3, (0, 0, 0), -1)
+                center_x.append(int(point))
+                # print("object center is " + str(x + w / 2))
+
+    if len(center_x) > 1:
+        center_point = sum(center_x) / (len(center_x) - 1)
+    else:
+        center_point = 0
+    cv2.circle(src, (int(center_point), 240), 5, (0, 255, 0), -1)
+    cv2.line(src, (320, 0), (320, 480), (0, 0, 255), 2)
+    return center_point
+
+
+def calculate_error(center_point, image_width):
+    return image_width / 2 - center_point
+
+
+def empty():
+    pass
+
+def same_color_judge(src):
+    hsv = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
+
+    lower = np.array(low_hsv)
+    higher = np.array(high_hsv)
+
+    dst1 = cv2.inRange(hsv, lower[0], higher[0])
+    dst2 = cv2.inRange(hsv, lower[1], higher[1])
+
+    # dst = cv2.add(dst1, dst2)
+
+    element3 = np.ones((3, 3), np.uint8)
+    # image preprocess #
+    # cv2.erode(dst, element3, dst)
+    # cv2.erode(dst, element3, dst)
+    cv2.erode(dst1, element3, dst1)
+    cv2.dilate(dst1, element3, dst1)
+    cv2.dilate(dst1, element3, dst1)
+
+    #cv2.dilate(dst2, element3, dst2)
+    cv2.erode(dst2, element3, dst2)
+    cv2.dilate(dst2, element3, dst2)
+    cv2.dilate(dst2, element3, dst2)
+    cv2.erode(dst2,element3,dst2)
+   
+    ret1, contours1, hierarchy1 = cv2.findContours(dst1, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    ret2, contours2, hierarchy2 = cv2.findContours(dst2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    #cv2.imshow('dst1',dst1)
+    #cv2.imshow('dst2',dst2)
+
+    area1_list = []
+    area2_list = []
+
+    area1_cnt = 0
+    area2_cnt = 0
+
+
+
+    for i in contours1:
+        area1  = cv2.contourArea(i)
+        #print("red size:")
+       # print(area1)
+        if area1 > 5000:
+            area1_cnt+=1
+            x, y, w, h = cv2.boundingRect(i)
+            cv2.rectangle(src, (x, y), (x + w, y + h), (0, 0, 255), 2)
+    
+    
+    
+    
+    
+    for j in contours2:
+        #print("red size:")
+        #print(area1)
+        area2  = cv2.contourArea(j)
+        if area2 > 5000:
+            area2_cnt+=1
+            x, y, w, h = cv2.boundingRect(j)
+            cv2.rectangle(src, (x, y), (x + w, y + h), (255, 0, 0), 2)
+
+
+    if area1_cnt >= 1 and area2_cnt < 1:
+        print("same red")
+        return 1
+    elif area2_cnt >= 1 and area1_cnt < 1:
+        print('same blue')
+        return 2
+    else: 
+        print("normal")    
+        return 0
+
+def Setcamera(cap):
+    cap.set(6,cv2.VideoWriter.fource('M','J','P','G'))
+	
+if __name__=="__main__":
+    #low_hsv = [[0, 131, 21], [77, 255, 0]]
+    #high_hsv = [[13, 255, 255], [131, 255, 255]]  # RED BLUE
+    rospy.init_node("camera")
+    rospy.loginfo("hello");
+    
+    pub = rospy.Publisher('/camera', Twist, queue_size=5)
+      
+    twist = Twist()
+      
+    cap = cv2.VideoCapture() # choose camera
+    cap.open(0)
+    cap.set(6,cv2.VideoWriter.fourcc('M','J','P','G'))
+    cap.set(3, 640)  # Width
+    cap.set(4, 480)  # Height
+    cap.set(15, -6)  # < -5
+
+    # if get threshold or not 
+    debug = 1
+    debug1 = 0
+
+    if debug:
+        cv2.namedWindow("TrackBars")
+        #print("yes------------------------------------------")
+        cv2.resizeWindow("TrackBars", 640, 240)
+        cv2.createTrackbar("Hue Min", "TrackBars", 0, 179, empty)
+        cv2.createTrackbar("Hue Max", "TrackBars", 19, 179, empty)
+        cv2.createTrackbar("Sat Min", "TrackBars", 110, 255, empty)
+        cv2.createTrackbar("Sat Max", "TrackBars", 240, 255, empty)
+        cv2.createTrackbar("Val Min", "TrackBars", 153, 255, empty)
+        cv2.createTrackbar("Val Max", "TrackBars", 255, 255, empty)
+        cv2.namedWindow("image")
+        cv2.createTrackbar("r", "image",0,255,empty)
+        #print("no------------------------------------------")
+
+    while True:
+        ret, frame = cap.read()
+        # threshold adapt
+        if debug:
+            imgHSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            
+            cv2.imshow("r", ret)
+            cv2.waitKey(1)
+            r = cv2.getTrackbarPos("r", "image")
+            #h_min = cv2.getTrackbarPos("Hue Min", "TrackBars")
+            #h_max = cv2.getTrackbarPos("Hue Max", "TrackBars")
+            #s_min = cv2.getTrackbarPos("Sat Min", "TrackBars")
+            #s_max = cv2.getTrackbarPos("Sat Max", "TrackBars")
+            #v_min = cv2.getTrackbarPos("Val Min", "TrackBars")
+            #v_max = cv2.getTrackbarPos("Val Max", "TrackBars")
+            #print(h_min, h_max, s_min, s_max, v_min, v_max)
+            #lower = np.array([h_min, s_min, v_min])
+            #upper = np.array([h_max, s_max, v_max])
+            #mask = cv2.inRange(imgHSV, lower, upper)
+
+            #cv2.imshow("imgMask", mask)
+            #cv2.imshow("TrackBars", frame)
+
+            #cv2.waitKey(1)
+            continue
+
+        # ------------Threshold end------------ #
+        # error = lose_cnt = 0
+        # center = my_find_contours(frame)
+        #center_last = center
+        #if center != 0:
+        #    find_flag = 1
+        #    lose_cnt = 0
+        #    error = calculate_error(center, 640)
+        #else:
+        #    lose_cnt += 1
+        #    if lose_cnt == 3:
+        #        lose_cnt = 0
+
+        #if center == 0 and lose_cnt != 0:
+        #    calculate_error(center_last, 640)
+        # ---------------- GET ERROR HERE -------------------- #
+        #print(error)
+        # ---You should convert the deviation into the steering gear deflection here, and use it--- #
+
+        both_color = same_color_judge(frame)
+        cv2.imshow('src', frame)
+
+        if cv2.waitKey(1) == 'q':
+            break
+        twist.linear.x = both_color
+        pub.publish(twist)
+
+    cap.release()
+    cv2.destroyAllWindows
+ipp_file=../ippicv_linux_20151201.tgz             &&
+ipp_hash=$(md5sum $ipp_file | cut -d" " -f1)      &&
+ipp_dir=3rdparty/ippicv/downloads/linux-$ipp_hash &&
+
+mkdir -p $ipp_dir &&
+cp $ipp_file $ipp_dir
+make
+ipp_file=../ippicv_linux_20151201.tgz && ipp_hash=$(md5sum $ipp_file | cut -d" " -f1) && ipp_dir=3rdparty/ippicv/downloads/linux-$ipp_hash && mkdir -p $ipp_dir && cp $ipp_file $ipp_dir

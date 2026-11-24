@@ -1,0 +1,4 @@
+# set the udev rule , make the device_port be fixed by ls-lidar
+#
+KERNELS=="2-5:1.0",ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE:="0666", SYMLINK+="laser"
+
